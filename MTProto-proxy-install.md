@@ -138,3 +138,38 @@ if __name__ == '__main__':
 ## статистика через телегу
 
 Если нужен не только личный доступ, но и статистика через Telegram, тогда можно зарегистрировать прокси у `@MTProxyBot` и добавить тег через параметр `-P`. Для личного сервера без монетизации шаг необязателен.
+
+# Проблемы
+
+## Падает сервис с ошибкой по assertion PID в логах
+
+Если сервис упал с ошибкой в логах с такой строкой: 
+
+    mtproto-proxy: common/pid.c:42: init_common_PID: Assertion '!(p & 0xffff0000)' failed.
+
+то проблема в том, что в исходниках `MTProxy` в `init_common_PID()` стоит `assert (!(p & 0xffff0000));` сразу после `getpid()`, то есть процесс аварийно завершается, если `PID` больше `65535`. Это известная проблема MTProxy.
+
+### Проверка: 
+
+    cat /proc/sys/kernel/pid_max
+
+если значение больше `65535`
+
+    sysctl -w kernel.pid_max=65535
+
+сбрасываем счётчик падений и перезапускаем сервис
+
+    systemctl reset-failed mtproto-proxy.service
+    systemctl restart mtproto-proxy.service
+    systemctl status mtproto-proxy.service -l --no-pager
+
+### Решение:
+
+Если это помогло, то прописываем в конфиг ограничнение:
+
+    printf 'kernel.pid_max = 65535\n' > /etc/sysctl.d/99-mtproxy.conf
+    sysctl --system
+
+возможно надо рестартануть: 
+
+    systemctl restart mtproto-proxy.service
