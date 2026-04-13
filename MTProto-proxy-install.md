@@ -101,7 +101,7 @@ if __name__ == '__main__':
     [Service]
     Type=simple
     WorkingDirectory=/opt/mtproxy/objs/bin
-    ExecStart=/opt/mtproxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S СЫРОЙ_СЕКРЕТ --aes-pwd /opt/mtproxy/data/proxy-secret /opt/mtproxy/data/proxy-multi.conf -M 1
+    ExecStart=/opt/mtproxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S СЫРОЙ_СЕКРЕТ --domain ДОМЕН_КОТОРЫЙ_УКАЗАЛИ --aes-pwd /opt/mtproxy/data/proxy-secret /opt/mtproxy/data/proxy-multi.conf -M 1
     Restart=on-failure
     RestartSec=3
     LimitNOFILE=65535
