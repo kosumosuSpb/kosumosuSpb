@@ -187,6 +187,16 @@ if __name__ == '__main__':
 
     --nat-info внутренний_ip:внешний_ip
 
+Это можно проверить: 
+
+    INTERNAL_IP=$(ip -4 route get 1.1.1.1 | awk '{print $7; exit}')
+    EXTERNAL_IP=$(curl -4fsS https://ifconfig.me)
+    
+    echo "internal=$INTERNAL_IP"
+    echo "external=$EXTERNAL_IP"
+
+на выходе ip должны совпадать. Если нет: надо прописать в `--nat-info`
+
 ## Соединение с прокси висит на проверке и не устанавливается
 
 Вероятно, проблема в связи между VPS с прокси и Telegram DC. Можно проверить доступность серверов из конфига. 
