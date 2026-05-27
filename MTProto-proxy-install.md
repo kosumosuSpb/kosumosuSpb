@@ -103,8 +103,10 @@ if __name__ == '__main__':
     Description=MTProxy
     After=network.target
     [Service]
-    ExecStart=/usr/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S ЗДЕСЬ_СЫРОЙ_СЕКРЕТ --domain ДОМЕН_КОТОРЫЙ_УКАЗАЛИ --aes-pwd /etc/mtproto-proxy/proxy-secret /etc/mtproto-proxy/proxy-multi.conf -M 1
+    WorkingDirectory=/opt/mtproxy/objs/bin
+    ExecStart=/opt/mtproxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S СЫРОЙ_СЕКРЕТ --domain ДОМЕН_КОТОРЫЙ_УКАЗАЛИ --aes-pwd /opt/mtproxy/data/proxy-secret /opt/mtproxy/data/proxy-multi.conf -M 1
     Restart=on-failure
+    RestartSec=3
     [Install]
     WantedBy=multi-user.target
 
