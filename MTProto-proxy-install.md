@@ -25,6 +25,35 @@
     curl -fsSL https://core.telegram.org/getProxySecret -o /opt/mtproxy/data/proxy-secret 
     curl -fsSL https://core.telegram.org/getProxyConfig -o /opt/mtproxy/data/proxy-multi.conf
 
+## Секрет без питона
+
+### Сырой секрет
+
+    SECRET=$(openssl rand -hex 16) && echo "$SECRET"
+
+**либо так:** 
+
+    head -c 16 /dev/urandom | xxd -ps
+
+### hex строка в ahcii домена
+
+**через xxd:**
+
+    site='ya.ru' && printf '%s' "$site" | xxd -p -c 256
+
+**либо od:**
+
+    site='ya.ru'
+    printf '%s' "$site" | od -An -tx1 | tr -d ' \n'
+
+**либо hexdump:**
+
+    site='ya.ru'
+    printf '%s' "$site" | hexdump -ve '1/1 "%.2x"'
+
+<details>
+  <summary>как вариант: питон скриптом можно получит секрет</summary>
+
 ## Питон скрипт для получения секретов: 
 
     nano gen_keys.py
@@ -52,43 +81,19 @@ if __name__ == '__main__':
 
     python3 gen_keys.py
 
-вписать домен под который маскироваться, нажать `Enter`
+Вписать домен под который маскироваться, нажать `Enter`
 
-## Секрет без питона
+</details>
 
-### Сырой секрет
+## секрет в ссылке будет иметь вид
 
-    SECRET=$(openssl rand -hex 16) 
-    echo "$SECRET"
-
-**либо так:** 
-
-    head -c 16 /dev/urandom | xxd -ps
-
-### hex строка в ahcii домена
-
-**через xxd:**
-
-    site='ya.ru'
-    printf '%s' "$site" | xxd -p -c 256
-
-**либо od:**
-
-    site='ya.ru'
-    printf '%s' "$site" | od -An -tx1 | tr -d ' \n'
-
-**либо hexdump:**
-
-    site='ya.ru'
-    printf '%s' "$site" | hexdump -ve '1/1 "%.2x"'
-
-сырой секрет нужно будет указать в сервис-файле, а юзеру в ссылке отдавать такой: 
+Сырой секрет нужно будет указать в сервис-файле, а юзеру в ссылке отдавать такой: 
 
     ee + сырой_секрет + hex_строка_домена
 
 ## systemd сервис
 
-дальше нужно создать systemd сервис файл: 
+Дальше нужно создать systemd сервис файл: 
 
     touch /etc/systemd/system/mtproxy.service
 
@@ -97,18 +102,13 @@ if __name__ == '__main__':
     [Unit]
     Description=MTProxy
     After=network.target
-    Wants=network-online.target
     [Service]
-    Type=simple
-    WorkingDirectory=/opt/mtproxy/objs/bin
-    ExecStart=/opt/mtproxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S СЫРОЙ_СЕКРЕТ --domain ДОМЕН_КОТОРЫЙ_УКАЗАЛИ --aes-pwd /opt/mtproxy/data/proxy-secret /opt/mtproxy/data/proxy-multi.conf -M 1
+    ExecStart=/usr/bin/mtproto-proxy -u nobody -p 8888 -H 443 --http-stats -S ЗДЕСЬ_СЫРОЙ_СЕКРЕТ --domain ДОМЕН_КОТОРЫЙ_УКАЗАЛИ --aes-pwd /etc/mtproto-proxy/proxy-secret /etc/mtproto-proxy/proxy-multi.conf -M 1
     Restart=on-failure
-    RestartSec=3
-    LimitNOFILE=65535
     [Install]
     WantedBy=multi-user.target
 
-* `-M 1` -- это один воркер
+* `-M 1` -- это один воркер. Если используется FakeTLS -- то рекомендуется это убрать, но по факту у меня особо не влияло на работу.
 * `8888` -- порт для доступа к статистике `wget http://127.0.0.1:8888/stats -O FILE_NAME -q`
 
 ## запуск:
@@ -126,25 +126,27 @@ if __name__ == '__main__':
 
 ## ссылка для юзера: 
 
-`tg://proxy?server=IP_ADDRESS&port=443&secret=USER_SECRET_STARTS_FROM_EE`
+`tg://proxy?server=IP_ADDRESS&port=443&secret=eeUserSecretHexDomain`
 
 или
 
-`https://t.me/proxy?server=IP_ADDRESS&port=443&secret=USER_SECRET_STARTS_FROM_EE`
+`https://t.me/proxy?server=IP_ADDRESS&port=443&secret=eeUserSecretHexDomain`
+
+Если же не хотите использовать FakeTLS, то в сервисе не нужно указывать --domain и секрет в ссылке должен начинаться не с `ee`, а с `dd`.
 
 ## Обновление конфигов
 
-телеграм рекомендует обновлять конфигурацию раз в сутки: 
+Телеграм рекомендует обновлять конфигурацию раз в сутки: 
 
     tee /etc/cron.d/mtproxy-update >/dev/null <<EOF 
     17 4 * * * root curl -fsSL https://core.telegram.org/getProxyConfig -o /opt/mtproxy/data/proxy-multi.conf && systemctl restart mtproxy 
     EOF
 
-## статистика через телегу
+## Статистика через телегу
 
 Если нужен не только личный доступ, но и статистика через Telegram, тогда можно зарегистрировать прокси у `@MTProxyBot` и добавить тег через параметр `-P`. Для личного сервера без монетизации шаг необязателен.
 
-# Проблемы
+# Диагностика неполадок
 
 ## Падает сервис с ошибкой по assertion PID в логах
 
@@ -184,3 +186,20 @@ if __name__ == '__main__':
 такое бывает, если виртуальная машина поднята через NAT. Надо указать внутренний и внешние адреса в параметрах запуска: 
 
     --nat-info внутренний_ip:внешний_ip
+
+## Соединение с прокси висит на проверке и не устанавливается
+
+Вероятно, проблема в связи между VPS с прокси и Telegram DC. Можно проверить доступность серверов из конфига. 
+
+В `bash` пишем:
+
+    awk '/^proxy_for/ {gsub(/;/, "", $3); print $3}' /opt/mtproxy/data/proxy-multi.conf \
+      | sort -u \
+      | while read hp; do
+          ip="${hp%:*}"
+          port="${hp#*:}"
+          printf "%-24s " "$hp"
+          timeout 3 bash -c "</dev/tcp/$ip/$port" && echo "OK" || echo "FAIL"
+        done
+
+Если много `FAIL`, то можно спросить у техподдержки, что за дела (может вообще заблочили телегу)
